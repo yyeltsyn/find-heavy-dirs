@@ -34,6 +34,7 @@ func TestTop(t *testing.T) {
 	}{
 		{inputStruct{"/var/www/", 2}, outputStruct{[]FileWithSize{{"/var/www/c", 3}, {"/var/www/b", 2}}, FileWithSize{"REST", 1}, FileWithSize{"/var/www/", 6}}},
 		{inputStruct{"/var/", 2}, outputStruct{[]FileWithSize{{"/var/www/", 6}, {"/var/c", 3}}, FileWithSize{"REST", 3}, FileWithSize{"/var/", 12}}},
+		{inputStruct{"/var", 2}, outputStruct{[]FileWithSize{{"/var/www/", 6}, {"/var/c", 3}}, FileWithSize{"REST", 3}, FileWithSize{"/var/", 12}}},
 		{inputStruct{"/", 2}, outputStruct{[]FileWithSize{{"/var/", 12}, {"/c", 3}}, FileWithSize{"REST", 3}, FileWithSize{"/", 18}}},
 	}
 

@@ -3,6 +3,7 @@ package core
 import (
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type FileWithSize struct {
@@ -85,12 +86,16 @@ func (c *Core) appendResult(res FileWithSize) {
 }
 
 func (c *Core) top(req request) {
-	slice := c.pathSize[req.dir]
-	if !c.sorted[req.dir] {
+	dir := req.dir
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+	slice := c.pathSize[dir]
+	if !c.sorted[dir] {
 		sort.Slice(slice, func(i, j int) bool {
 			return slice[i].Size > slice[j].Size
 		})
-		c.sorted[req.dir] = true
+		c.sorted[dir] = true
 	}
 
 	var totalSize int64
@@ -114,7 +119,7 @@ func (c *Core) top(req request) {
 	}
 
 	req.results <- FileWithSize{
-		Path: req.dir,
+		Path: dir,
 		Size: totalSize,
 	}
 
