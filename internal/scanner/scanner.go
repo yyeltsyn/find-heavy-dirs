@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/yyeltsyn/heavy-files/core"
+	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
 )
 
 func Scan(dir string, results chan<- core.FileWithSize, done chan<- int) {

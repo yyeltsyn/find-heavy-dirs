@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/yyeltsyn/heavy-files/core"
-	"github.com/yyeltsyn/heavy-files/scanner"
+	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
+	"github.com/yyeltsyn/find-heavy-dirs/internal/scanner"
 )
 
 var limitFlag = flag.Int("top", 10, "How many top items show")
