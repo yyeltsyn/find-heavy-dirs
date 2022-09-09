@@ -7,8 +7,8 @@ import (
 )
 
 type FileWithSize struct {
-	Path string
-	Size int64
+	Path string `json:"path"`
+	Size int64  `json:"size"`
 }
 
 type request struct {

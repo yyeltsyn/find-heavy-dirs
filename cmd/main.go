@@ -9,10 +9,12 @@ import (
 
 	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
 	"github.com/yyeltsyn/find-heavy-dirs/internal/scanner"
+	"github.com/yyeltsyn/find-heavy-dirs/internal/web"
 )
 
 var limitFlag = flag.Int("top", 10, "How many top items show")
 var verboseFlag = flag.Bool("v", false, "Show progress")
+var webserverFlag = flag.Bool("w", false, "Open in browser")
 
 func main() {
 	flag.Usage = func() {
@@ -52,13 +54,20 @@ func main() {
 
 	go core.Start(results)
 	go scanner.Scan(dir, results, done)
+	if *webserverFlag {
+		go func() {
+			err := web.StartServer()
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}()
+		web.StartClient(dir, *limitFlag)
+	}
 
 	var ticker <-chan time.Time
 	if *verboseFlag {
 		ticker = time.NewTicker(time.Second).C
 	}
 
-OUTER:
+LOOP:
 	for {
 		select {
 		case <-ticker:
@@ -66,8 +75,15 @@ OUTER:
 			fmt.Println()
 		case <-done:
 			printResults(dir, *limitFlag)
-			break OUTER
+			break LOOP
 		}
+	}
+
+	if *webserverFlag {
+		for web.HasClients() {
+			time.Sleep(100 * time.Millisecond)
+		}
+		fmt.Fprintln(os.Stderr, "No active web clients, exit")
 	}
 }
 
