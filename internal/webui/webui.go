@@ -24,13 +24,19 @@ var indexHtml []byte
 var serverStartTime time.Time
 var lastRequestTime time.Time
 
+var serverClosed chan int
+
 func Start(dir string, limit int) error {
+	serverStartTime = time.Now()
+	serverClosed = make(chan int)
+	defer close(serverClosed)
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/html")
 		w.Write(indexHtml)
 	})
 
-	http.HandleFunc("/top", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/top", func(w http.ResponseWriter, r *http.Request) {
 		lastRequestTime = time.Now()
 
 		dir := r.URL.Query().Get("dir")
@@ -58,15 +64,13 @@ func Start(dir string, limit int) error {
 		w.Write(output)
 	})
 
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", ":0") // any available port
 	if err != nil {
 		return err
 	}
 
-	serverStartTime = time.Now()
-
 	serverPort := listener.Addr().(*net.TCPAddr).Port
-	err = startClient(serverPort, dir, limit)
+	err = startBrowser(serverPort, dir, limit)
 	if err != nil {
 		return err
 	}
@@ -74,7 +78,7 @@ func Start(dir string, limit int) error {
 	return http.Serve(listener, nil)
 }
 
-func startClient(port int, dir string, limit int) error {
+func startBrowser(port int, dir string, limit int) error {
 	values := url.Values{}
 	values.Set("startDir", dir)
 	values.Set("startLimit", strconv.Itoa(limit))
@@ -97,8 +101,14 @@ func startClient(port int, dir string, limit int) error {
 }
 
 func Active() bool {
-	if serverStartTime.IsZero() { // hmm, server is not started
-		return false
+	if serverClosed == nil {
+		return true // server is not started yet
+	}
+	select {
+	case <-serverClosed:
+		return false // server is already closed
+	default:
+		// server is starting or serving, continue
 	}
 	if time.Since(serverStartTime) < warmupDuration {
 		return true

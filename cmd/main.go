@@ -14,51 +14,22 @@ import (
 
 var limitFlag = flag.Int("top", 10, "How many top items show")
 var verboseFlag = flag.Bool("v", false, "Show progress")
-var webserverFlag = flag.Bool("w", false, "Open in browser")
+var webuiFlag = flag.Bool("w", false, "Open results in browser")
+var directoryArg string
 
 func main() {
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stdout, "Usage: %s [OPTION]... [DIRECTORY]\n", os.Args[0])
-		fmt.Fprintf(os.Stdout, "Scans DIRECTORY (by default current directory)\n\n")
-		flag.CommandLine.SetOutput(os.Stdout)
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-	args := flag.Args()
-	if len(args) > 1 {
-		fmt.Fprintln(os.Stderr, "Error: More than one directory given")
-		flag.Usage()
-		os.Exit(1)
-	}
-	dir := flag.Arg(0)
-	if dir == "" {
-		dir = "."
-	}
-	dir, err := filepath.Abs(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-	fileinfo, err := os.Stat(dir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-	if !fileinfo.IsDir() {
-		fmt.Fprintf(os.Stderr, "Error: is not directory: %s\n", dir)
-		os.Exit(1)
-	}
+	parseFlagsAndArguments()
 
 	var results = make(chan core.FileWithSize)
-	var done = make(chan int)
+	var scanDone = make(chan int)
 
 	go core.Start(results)
-	go scanner.Scan(dir, results, done)
-	if *webserverFlag {
+	go scanner.Scan(directoryArg, results, scanDone)
+	if *webuiFlag {
 		go func() {
-			err := webui.Start(dir, *limitFlag)
+			err := webui.Start(directoryArg, *limitFlag)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
+				fmt.Fprintf(os.Stderr, "error: start webui: %v\n", err)
 			}
 		}()
 	}
@@ -72,19 +43,54 @@ LOOP:
 	for {
 		select {
 		case <-ticker:
-			printResults(dir, *limitFlag)
+			printResults(directoryArg, *limitFlag)
 			fmt.Println()
-		case <-done:
-			printResults(dir, *limitFlag)
+		case <-scanDone:
+			printResults(directoryArg, *limitFlag)
 			break LOOP
 		}
 	}
 
-	if *webserverFlag {
+	if *webuiFlag {
 		for webui.Active() {
 			time.Sleep(100 * time.Millisecond)
 		}
 		fmt.Fprintln(os.Stderr, "No active web clients, exit")
+	}
+}
+
+func parseFlagsAndArguments() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stdout, "Usage: %s [OPTION]... [DIRECTORY]\n", os.Args[0])
+		fmt.Fprintf(os.Stdout, "Scans DIRECTORY (by default current directory)\n\n")
+		flag.CommandLine.SetOutput(os.Stdout)
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+	args := flag.Args()
+	if len(args) > 1 {
+		fmt.Fprintln(os.Stderr, "Error: More than one directory given")
+		flag.Usage()
+		os.Exit(1)
+	}
+	directoryArg = flag.Arg(0)
+	if directoryArg == "" {
+		directoryArg = "."
+	}
+	var err error // for reliability
+	directoryArg, err = filepath.Abs(directoryArg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	fileinfo, err := os.Stat(directoryArg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	if !fileinfo.IsDir() {
+		fmt.Fprintf(os.Stderr, "Error: is not directory: %s\n", directoryArg)
+		os.Exit(1)
 	}
 }
 
