@@ -21,8 +21,8 @@ const waitClientDuration = 3 * time.Second
 //go:embed index.html
 var indexHtml []byte
 
-var serverStartTime *time.Time
-var lastRequestTime *time.Time
+var serverStartTime time.Time
+var lastRequestTime time.Time
 
 var serverPort int
 var serverStarted = make(chan int)
@@ -34,8 +34,7 @@ func StartServer() error {
 	})
 
 	http.HandleFunc("/top", func(w http.ResponseWriter, r *http.Request) {
-		now := time.Now()
-		lastRequestTime = &now
+		lastRequestTime = time.Now()
 
 		dir := r.URL.Query().Get("dir")
 		if dir == "" {
@@ -69,8 +68,7 @@ func StartServer() error {
 
 	serverPort = listener.Addr().(*net.TCPAddr).Port
 
-	now := time.Now()
-	serverStartTime = &now
+	serverStartTime = time.Now()
 
 	close(serverStarted)
 
@@ -79,6 +77,7 @@ func StartServer() error {
 
 func StartClient(dir string, limit int) error {
 	<-serverStarted
+
 	values := url.Values{}
 	values.Set("startDir", dir)
 	values.Set("startLimit", strconv.Itoa(limit))
@@ -101,15 +100,15 @@ func StartClient(dir string, limit int) error {
 }
 
 func HasClients() bool {
-	if serverStartTime == nil { // hmm, server is not started
+	if serverStartTime.IsZero() { // hmm, server is not started
 		return false
 	}
-	if time.Since(*serverStartTime) < warmupDuration {
+	if time.Since(serverStartTime) < warmupDuration {
 		return true
 	}
-	if lastRequestTime == nil {
+	if lastRequestTime.IsZero() {
 		return false
 	}
 
-	return time.Since(*lastRequestTime) < waitClientDuration
+	return time.Since(lastRequestTime) < waitClientDuration
 }

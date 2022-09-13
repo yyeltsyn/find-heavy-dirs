@@ -59,7 +59,10 @@ func main() {
 			err := web.StartServer()
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 		}()
-		web.StartClient(dir, *limitFlag)
+		err := web.StartClient(dir, *limitFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
 	}
 
 	var ticker <-chan time.Time

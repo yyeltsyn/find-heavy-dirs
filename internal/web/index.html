@@ -1,8 +1,23 @@
 <html>
 <head>
     <title>Find Heavy Dirs</title>
+    <style>
+        #dataDiv > table td:nth-child(1) {
+            text-align: center;
+            min-width: 20px;
+        }
+        #dataDiv > table td:nth-child(2) {
+            text-align: right;
+            min-width: 100px;
+        }
+        #dataDiv > table td:nth-child(3) {
+            padding-left: 10px
+        }
+    </style>
 </head>
 <body onload="onLoad()">
+    <button onclick="resetDir()">Top</button>
+    <button onclick="upDir()">Up</button>
     <input id="dir" type="text" />
     <input id="limit" type="number" min="1" />
     <hr/>
@@ -15,6 +30,28 @@
         function onLoad() {
             document.getElementById('dir').value = params.startDir
             document.getElementById('limit').value = params.startLimit
+        }
+
+        function resetDir() {
+            document.getElementById('dir').value = params.startDir
+            updateData()
+        }
+
+        function upDir() {
+            let el = document.getElementById('dir')
+            let dir = el.value
+            dir = dir.substring(0, dir.length-tail(dir).length)
+            el.value = dir
+            updateData()
+        }
+
+        function tail(path) {
+            const regex = /^.*?[\/]([^\/]+[\/]?)$/
+            const found = path.match(regex)
+            if (found === null) {
+                return ''
+            }
+            return found[1]
         }
 
         function updateData() {
@@ -31,19 +68,23 @@
             var myTableDiv = document.getElementById("dataDiv");
 
             var table = document.createElement('TABLE');
-            table.border = '1';            
+            table.border = '1';
 
             var tableBody = document.createElement('TBODY');
             table.appendChild(tableBody);
 
             for (var i = 0; i < data.top.length; i++) {
-                tableBody.appendChild(buildTr(i+1, humanFileSize(data.top[i].size, true), data.top[i].path));
+                let file = tail(data.top[i].path)
+                if (file.endsWith('/')) {
+                    file = createDirLink(file, data.top[i].path)
+                }
+                tableBody.appendChild(buildTr(i+1, humanFileSize(data.top[i].size, true), file));
             }
             if (data.rest.size > 0) {
-                tableBody.appendChild(buildTr('...', humanFileSize(data.rest.size, true), 'others...'));
+                tableBody.appendChild(buildTr('...', humanFileSize(data.rest.size, true), 'other files...'));
             }
-            tableBody.appendChild(buildTr('', ' ', ' '));
-            tableBody.appendChild(buildTr('total', humanFileSize(data.total.size, true), data.total.path))
+            tableBody.appendChild(buildTr('-', '-', '-'));
+            tableBody.appendChild(buildTr('*', humanFileSize(data.total.size, true), data.total.path))
             myTableDiv.replaceChildren(table);
         }
 
@@ -52,11 +93,22 @@
 
             for(let value of values) {
                 let td = document.createElement('TD')
-                td.appendChild(document.createTextNode(value))
+                let node = ['string', 'number'].includes(typeof value) ? document.createTextNode(value) : value
+                td.appendChild(node)
                 tr.appendChild(td)
             }
 
             return tr
+        }
+
+        function createDirLink(text, path) {
+            let a = document.createElement('A')
+            a.appendChild(document.createTextNode(text))
+            a.onclick = function() {
+                document.getElementById('dir').value = path
+                updateData()
+            }
+            return a
         }
 
         function humanFileSize(bytes, si=false, dp=1) {
