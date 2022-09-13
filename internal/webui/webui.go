@@ -1,4 +1,4 @@
-package web
+package webui
 
 import (
 	_ "embed"
@@ -24,10 +24,7 @@ var indexHtml []byte
 var serverStartTime time.Time
 var lastRequestTime time.Time
 
-var serverPort int
-var serverStarted = make(chan int)
-
-func StartServer() error {
+func Start(dir string, limit int) error {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/html")
 		w.Write(indexHtml)
@@ -66,22 +63,22 @@ func StartServer() error {
 		return err
 	}
 
-	serverPort = listener.Addr().(*net.TCPAddr).Port
-
 	serverStartTime = time.Now()
 
-	close(serverStarted)
+	serverPort := listener.Addr().(*net.TCPAddr).Port
+	err = startClient(serverPort, dir, limit)
+	if err != nil {
+		return err
+	}
 
 	return http.Serve(listener, nil)
 }
 
-func StartClient(dir string, limit int) error {
-	<-serverStarted
-
+func startClient(port int, dir string, limit int) error {
 	values := url.Values{}
 	values.Set("startDir", dir)
 	values.Set("startLimit", strconv.Itoa(limit))
-	url := fmt.Sprintf("http://localhost:%d/?%s", serverPort, values.Encode())
+	url := fmt.Sprintf("http://localhost:%d/?%s", port, values.Encode())
 
 	var err error
 
@@ -99,7 +96,7 @@ func StartClient(dir string, limit int) error {
 	return err
 }
 
-func HasClients() bool {
+func Active() bool {
 	if serverStartTime.IsZero() { // hmm, server is not started
 		return false
 	}

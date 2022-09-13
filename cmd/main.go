@@ -9,7 +9,7 @@ import (
 
 	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
 	"github.com/yyeltsyn/find-heavy-dirs/internal/scanner"
-	"github.com/yyeltsyn/find-heavy-dirs/internal/web"
+	"github.com/yyeltsyn/find-heavy-dirs/internal/webui"
 )
 
 var limitFlag = flag.Int("top", 10, "How many top items show")
@@ -56,13 +56,11 @@ func main() {
 	go scanner.Scan(dir, results, done)
 	if *webserverFlag {
 		go func() {
-			err := web.StartServer()
-			fmt.Fprintf(os.Stderr, "%v\n", err)
+			err := webui.Start(dir, *limitFlag)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%v\n", err)
+			}
 		}()
-		err := web.StartClient(dir, *limitFlag)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-		}
 	}
 
 	var ticker <-chan time.Time
@@ -83,7 +81,7 @@ LOOP:
 	}
 
 	if *webserverFlag {
-		for web.HasClients() {
+		for webui.Active() {
 			time.Sleep(100 * time.Millisecond)
 		}
 		fmt.Fprintln(os.Stderr, "No active web clients, exit")
