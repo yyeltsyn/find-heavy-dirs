@@ -21,22 +21,20 @@ const waitClientDuration = 3 * time.Second
 //go:embed index.html
 var indexHtml []byte
 
-var serverStartTime time.Time
+var startTime time.Time
 var lastRequestTime time.Time
 
-var serverClosed chan int
-
 func Start(core1 *core.Core, dir string, limit int) error {
-	serverStartTime = time.Now()
-	serverClosed = make(chan int)
-	defer close(serverClosed)
+	startTime = time.Now()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/html")
 		w.Write(indexHtml)
 	})
 
-	http.HandleFunc("/api/top", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/top", func(w http.ResponseWriter, r *http.Request) {
 		lastRequestTime = time.Now()
 
 		dir := r.URL.Query().Get("dir")
@@ -64,25 +62,38 @@ func Start(core1 *core.Core, dir string, limit int) error {
 		w.Write(output)
 	})
 
-	listener, err := net.Listen("tcp", ":0") // any available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0") // any available port
 	if err != nil {
 		return err
 	}
 
-	serverPort := listener.Addr().(*net.TCPAddr).Port
-	err = startBrowser(serverPort, dir, limit)
+	err = startBrowser(listener.Addr().String(), dir, limit)
 	if err != nil {
 		return err
 	}
 
-	return http.Serve(listener, nil)
+	srv := &http.Server{Handler: mux}
+
+	go func() {
+		for hasActiveClients() {
+			time.Sleep(100 * time.Millisecond)
+		}
+		srv.Close() // Note: ignore errors
+	}()
+
+	err = srv.Serve(listener)
+	if err != http.ErrServerClosed {
+		return err
+	}
+
+	return fmt.Errorf("no active clients, server closed")
 }
 
-func startBrowser(port int, dir string, limit int) error {
+func startBrowser(addr string, dir string, limit int) error {
 	values := url.Values{}
 	values.Set("startDir", dir)
 	values.Set("startLimit", strconv.Itoa(limit))
-	url := fmt.Sprintf("http://localhost:%d/?%s", port, values.Encode())
+	url := fmt.Sprintf("http://%s/?%s", addr, values.Encode())
 
 	var err error
 
@@ -100,17 +111,8 @@ func startBrowser(port int, dir string, limit int) error {
 	return err
 }
 
-func Active() bool {
-	if serverClosed == nil {
-		return true // server is not started yet
-	}
-	select {
-	case <-serverClosed:
-		return false // server is already closed
-	default:
-		// server is starting or serving, continue
-	}
-	if time.Since(serverStartTime) < warmupDuration {
+func hasActiveClients() bool {
+	if time.Since(startTime) < warmupDuration {
 		return true
 	}
 	if lastRequestTime.IsZero() {

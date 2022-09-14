@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/yyeltsyn/find-heavy-dirs/internal/cli"
 	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
@@ -35,23 +34,15 @@ func main() {
 
 	go cli.Start(core1, directoryArg, *limitFlag, *verboseFlag, scanDone)
 
-	if *webuiFlag {
-		go func() {
+	go func() {
+		if *webuiFlag {
 			err := webui.Start(core1, directoryArg, *limitFlag)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error: start webui: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error: webui: %v\n", err)
 			}
-		}()
-		go func() {
-			for webui.Active() {
-				time.Sleep(100 * time.Millisecond)
-			}
-			fmt.Fprintln(os.Stderr, "webui: no active web clients")
-			close(webuiDone)
-		}()
-	} else {
+		}
 		close(webuiDone)
-	}
+	}()
 
 	<-scanDone
 	<-webuiDone
