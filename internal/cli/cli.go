@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
@@ -29,16 +30,16 @@ LOOP:
 }
 
 func printResults(core1 *core.Core, dir string, limit int) {
-	pattern := "\t%8s\t%s\n"
+	pattern := "%5s\t%10s\t%s\n"
 	top, rest, total := core1.Top(dir, limit)
 	for i, result := range top {
-		fmt.Fprintf(os.Stdout, "% 2d."+pattern, i+1, bytesHumanReadable(result.Size), result.Path)
+		fmt.Fprintf(os.Stdout, pattern, strconv.Itoa(i+1)+".", bytesHumanReadable(result.Size), result.Path)
 	}
 	if rest.Size > 0 {
-		fmt.Fprintf(os.Stdout, "..."+pattern, bytesHumanReadable(rest.Size), "others...")
+		fmt.Fprintf(os.Stdout, pattern, "...", bytesHumanReadable(rest.Size), "the rest...")
 	}
 	fmt.Println()
-	fmt.Fprintf(os.Stdout, "Total"+pattern, bytesHumanReadable(total.Size), total.Path)
+	fmt.Fprintf(os.Stdout, pattern, "Total", bytesHumanReadable(total.Size), total.Path)
 }
 
 func bytesHumanReadable(b int64) string {

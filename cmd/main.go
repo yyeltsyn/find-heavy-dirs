@@ -22,6 +22,7 @@ func main() {
 
 	var results = make(chan core.FileWithSize)
 	var scanDone = make(chan int)
+	var cliDone = make(chan int)
 	var webuiDone = make(chan int)
 
 	core1 := core.NewCore()
@@ -32,7 +33,10 @@ func main() {
 		close(scanDone)
 	}()
 
-	go cli.Start(core1, directoryArg, *limitFlag, *verboseFlag, scanDone)
+	go func() {
+		cli.Start(core1, directoryArg, *limitFlag, *verboseFlag, scanDone)
+		close(cliDone)
+	}()
 
 	go func() {
 		if *webuiFlag {
@@ -45,6 +49,7 @@ func main() {
 	}()
 
 	<-scanDone
+	<-cliDone
 	<-webuiDone
 }
 
