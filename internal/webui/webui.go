@@ -26,7 +26,7 @@ var lastRequestTime time.Time
 
 var serverClosed chan int
 
-func Start(dir string, limit int) error {
+func Start(core1 *core.Core, dir string, limit int) error {
 	serverStartTime = time.Now()
 	serverClosed = make(chan int)
 	defer close(serverClosed)
@@ -50,7 +50,7 @@ func Start(dir string, limit int) error {
 			return
 		}
 
-		top, rest, total := core.Top(dir, limit)
+		top, rest, total := core1.Top(dir, limit)
 		output, err := json.Marshal(map[string]interface{}{
 			"top":   top,
 			"rest":  rest,

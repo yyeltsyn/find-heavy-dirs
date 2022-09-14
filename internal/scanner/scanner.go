@@ -9,7 +9,7 @@ import (
 	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
 )
 
-func Scan(dir string, results chan<- core.FileWithSize, done chan<- int) {
+func Scan(dir string, results chan<- core.FileWithSize) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -18,7 +18,6 @@ func Scan(dir string, results chan<- core.FileWithSize, done chan<- int) {
 	wg.Wait()
 
 	close(results)
-	close(done)
 }
 
 var sema = make(chan int, 20)

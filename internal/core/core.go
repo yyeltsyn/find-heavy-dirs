@@ -23,15 +23,13 @@ type Core struct {
 	requests chan request
 }
 
-func NewCore() Core {
-	return Core{
+func NewCore() *Core {
+	return &Core{
 		pathSize: make(map[string][]FileWithSize),
 		sorted:   make(map[string]bool),
 		requests: make(chan request),
 	}
 }
-
-var defaultCore = NewCore()
 
 func (c *Core) Start(results <-chan FileWithSize) {
 	for {
@@ -124,12 +122,4 @@ func (c *Core) top(req request) {
 	}
 
 	close(req.results)
-}
-
-func Start(results <-chan FileWithSize) {
-	defaultCore.Start(results)
-}
-
-func Top(dir string, limit int) (top []FileWithSize, rest FileWithSize, total FileWithSize) {
-	return defaultCore.Top(dir, limit)
 }

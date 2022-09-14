@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/yyeltsyn/find-heavy-dirs/internal/cli"
 	"github.com/yyeltsyn/find-heavy-dirs/internal/core"
 	"github.com/yyeltsyn/find-heavy-dirs/internal/scanner"
 	"github.com/yyeltsyn/find-heavy-dirs/internal/webui"
@@ -22,41 +23,38 @@ func main() {
 
 	var results = make(chan core.FileWithSize)
 	var scanDone = make(chan int)
+	var webuiDone = make(chan int)
 
-	go core.Start(results)
-	go scanner.Scan(directoryArg, results, scanDone)
+	core1 := core.NewCore()
+	go core1.Start(results)
+
+	go func() {
+		scanner.Scan(directoryArg, results)
+		close(scanDone)
+	}()
+
+	go cli.Start(core1, directoryArg, *limitFlag, *verboseFlag, scanDone)
+
 	if *webuiFlag {
 		go func() {
-			err := webui.Start(directoryArg, *limitFlag)
+			err := webui.Start(core1, directoryArg, *limitFlag)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error: start webui: %v\n", err)
 			}
 		}()
+		go func() {
+			for webui.Active() {
+				time.Sleep(100 * time.Millisecond)
+			}
+			fmt.Fprintln(os.Stderr, "webui: no active web clients")
+			close(webuiDone)
+		}()
+	} else {
+		close(webuiDone)
 	}
 
-	var ticker <-chan time.Time
-	if *verboseFlag {
-		ticker = time.NewTicker(time.Second).C
-	}
-
-LOOP:
-	for {
-		select {
-		case <-ticker:
-			printResults(directoryArg, *limitFlag)
-			fmt.Println()
-		case <-scanDone:
-			printResults(directoryArg, *limitFlag)
-			break LOOP
-		}
-	}
-
-	if *webuiFlag {
-		for webui.Active() {
-			time.Sleep(100 * time.Millisecond)
-		}
-		fmt.Fprintln(os.Stderr, "No active web clients, exit")
-	}
+	<-scanDone
+	<-webuiDone
 }
 
 func parseFlagsAndArguments() {
@@ -92,30 +90,4 @@ func parseFlagsAndArguments() {
 		fmt.Fprintf(os.Stderr, "Error: is not directory: %s\n", directoryArg)
 		os.Exit(1)
 	}
-}
-
-func printResults(dir string, limit int) {
-	pattern := "\t%8s\t%s\n"
-	top, rest, total := core.Top(dir, limit)
-	for i, result := range top {
-		fmt.Fprintf(os.Stdout, "% 2d."+pattern, i+1, bytesHumanReadable(result.Size), result.Path)
-	}
-	if rest.Size > 0 {
-		fmt.Fprintf(os.Stdout, "..."+pattern, bytesHumanReadable(rest.Size), "others...")
-	}
-	fmt.Println()
-	fmt.Fprintf(os.Stdout, "Total"+pattern, bytesHumanReadable(total.Size), total.Path)
-}
-
-func bytesHumanReadable(b int64) string {
-	const unit = 1000
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "kMGTPE"[exp])
 }
