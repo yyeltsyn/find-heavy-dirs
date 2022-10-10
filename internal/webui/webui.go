@@ -1,9 +1,10 @@
 package webui
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -18,8 +19,17 @@ import (
 const warmupDuration = 5 * time.Second
 const waitClientDuration = 3 * time.Second
 
-//go:embed index.html
-var indexHtml []byte
+//go:embed static
+var embeddedFs embed.FS
+var strippedFs fs.FS
+
+func init() {
+	var err error
+	strippedFs, err = fs.Sub(embeddedFs, "static")
+	if err != nil {
+		panic(err)
+	}
+}
 
 var startTime time.Time
 var lastRequestTime time.Time
@@ -29,10 +39,7 @@ func Start(core1 *core.Core, dir string, limit int) error {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/html")
-		w.Write(indexHtml)
-	})
+	mux.Handle("/", http.FileServer(http.FS(strippedFs)))
 
 	mux.HandleFunc("/api/top", func(w http.ResponseWriter, r *http.Request) {
 		lastRequestTime = time.Now()
