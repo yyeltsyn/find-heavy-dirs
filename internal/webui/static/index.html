@@ -3,125 +3,119 @@
     <title>Find Heavy Dirs</title>
     <link rel="stylesheet" href="styles.css" />
 </head>
-<body onload="onLoad()">
-    <button onclick="resetDir()">Top</button>
-    <button onclick="upDir()">Up</button>
-    <input id="dir" type="text" />
-    <input id="limit" type="number" min="1" />
-    <hr/>
-    <div id="dataDiv" />
-    <script type="text/javascript">
-        const params = new Proxy(new URLSearchParams(window.location.search), {
-            get: (searchParams, prop) => searchParams.get(prop),
-        });
+<body>
 
-        function onLoad() {
-            document.getElementById('dir').value = params.startDir
-            document.getElementById('limit').value = params.startLimit
-        }
+    <script src="vue.js"></script>
 
-        function resetDir() {
-            document.getElementById('dir').value = params.startDir
-            updateData()
-        }
+    <div id="app">
+        <button @click="resetDir">Top</button>
+        <button @click="upDir">Up</button>
+        <input v-model="dir" type="text" />
+        <input v-model="limit" type="number" min="1" />
+        <hr/>
+        <table class="itemsTable">
+            <thead>
 
-        function upDir() {
-            let el = document.getElementById('dir')
-            let dir = el.value
-            dir = dir.substring(0, dir.length-tail(dir).length)
-            el.value = dir
-            updateData()
-        }
+            </thead>
+            <tbody>
+                <tr v-for="(item, index) in top">
+                    <td>{{index+1}}</td>
+                    <td>{{humanFileSize(item.size)}}</td>
+                    <td @click="goto(item)">{{tail(item.path)}}</td>
+                </tr>
+                <tr v-if="rest">
+                    <td>...</td>
+                    <td>{{humanFileSize(rest.size)}}</td>
+                    <td>other files...</td>
+                </tr>
+                <tr>
+                    <td colspan="3">&nbsp;</td>
+                </tr>
+                <tr v-if="total">
+                    <td>*</td>
+                    <td>{{humanFileSize(total.size)}}</td>
+                    <td>{{total.path}}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
-        function tail(path) {
-            const regex = /^.*?[\/]([^\/]+[\/]?)$/
-            const found = path.match(regex)
-            if (found === null) {
-                return ''
-            }
-            return found[1]
-        }
+    <script>        
+        Vue.createApp({
+            data() {
+                const params = new Proxy(new URLSearchParams(window.location.search), {
+                    get: (searchParams, prop) => searchParams.get(prop),
+                });
 
-        function updateData() {
-            let url = window.location.origin + "/api/top"
-            + "?dir=" + document.getElementById('dir').value
-            + "&limit=" + document.getElementById('limit').value
-
-            fetch(url)
-            .then(x => x.json())
-            .then(x => renderData(x))
-        }
-
-        function renderData(data) {
-            var myTableDiv = document.getElementById("dataDiv");
-
-            var table = document.createElement('TABLE');
-            table.border = '1';
-
-            var tableBody = document.createElement('TBODY');
-            table.appendChild(tableBody);
-
-            for (var i = 0; i < data.top.length; i++) {
-                let file = tail(data.top[i].path)
-                if (file.endsWith('/')) {
-                    file = createDirLink(file, data.top[i].path)
+                return {
+                    top: [],
+                    rest: null,
+                    total: null,
+                    startDir: params.startDir,
+                    dir: params.startDir,
+                    startLimit: parseInt(params.startLimit),
+                    limit: parseInt(params.startLimit),
                 }
-                tableBody.appendChild(buildTr(i+1, humanFileSize(data.top[i].size, true), file));
+            },
+            methods: {
+                resetDir: function() {
+                    this.dir = this.startDir
+                },
+                upDir: function() {
+                    this.dir = this.dir.substring(0, this.dir.length-this.tail(this.dir).length)
+                },
+                tail: function(path) {
+                    const regex = /^.*?[\/]([^\/]+[\/]?)$/
+                    const found = path.match(regex)
+                    if (found === null) {
+                        return ''
+                    }
+                    return found[1]
+                },
+                updateData: function() {
+                    let url = window.location.origin + "/api/top"
+                        + "?dir=" + this.dir
+                        + "&limit=" + this.limit
+
+                    fetch(url)
+                        .then(x => x.json())
+                        .then(x => this.renderData(x))
+                },
+                renderData: function(data) {
+                    this.top = data.top
+                    this.rest = data.rest
+                    this.total = data.total
+                },
+                goto: function(item) {
+                    if (item.path.endsWith("/")) {
+                        this.dir = item.path
+                    }
+                },
+                humanFileSize: function(bytes, si=false, dp=1) {
+                    const thresh = si ? 1000 : 1024;
+
+                    if (Math.abs(bytes) < thresh) {
+                        return bytes + ' B';
+                    }
+
+                    const units = si
+                        ? ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+                        : ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+                    let u = -1;
+                    const r = 10**dp;
+
+                    do {
+                        bytes /= thresh;
+                        ++u;
+                    } while (Math.round(Math.abs(bytes) * r) / r >= thresh && u < units.length - 1);
+
+                    return bytes.toFixed(dp) + ' ' + units[u];
+                }
+            },
+            mounted() {
+                setInterval(this.updateData, 1000)
             }
-            if (data.rest.size > 0) {
-                tableBody.appendChild(buildTr('...', humanFileSize(data.rest.size, true), 'other files...'));
-            }
-            tableBody.appendChild(buildTr('-', '-', '-'));
-            tableBody.appendChild(buildTr('*', humanFileSize(data.total.size, true), data.total.path))
-            myTableDiv.replaceChildren(table);
-        }
-
-        function buildTr(...values) {
-            let tr = document.createElement('TR');
-
-            for(let value of values) {
-                let td = document.createElement('TD')
-                let node = ['string', 'number'].includes(typeof value) ? document.createTextNode(value) : value
-                td.appendChild(node)
-                tr.appendChild(td)
-            }
-
-            return tr
-        }
-
-        function createDirLink(text, path) {
-            let a = document.createElement('A')
-            a.appendChild(document.createTextNode(text))
-            a.onclick = function() {
-                document.getElementById('dir').value = path
-                updateData()
-            }
-            return a
-        }
-
-        function humanFileSize(bytes, si=false, dp=1) {
-            const thresh = si ? 1000 : 1024;
-
-            if (Math.abs(bytes) < thresh) {
-                return bytes + ' B';
-            }
-
-            const units = si
-                ? ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-                : ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
-            let u = -1;
-            const r = 10**dp;
-
-            do {
-                bytes /= thresh;
-                ++u;
-            } while (Math.round(Math.abs(bytes) * r) / r >= thresh && u < units.length - 1);
-
-
-            return bytes.toFixed(dp) + ' ' + units[u];
-        }
-
-        setInterval(updateData, 1000)
+        }).mount('#app')
     </script>
 </body>
 </html>

@@ -1,11 +1,11 @@
-#dataDiv > table td:nth-child(1) {
+.itemsTable td:nth-child(1) {
     text-align: center;
     min-width: 20px;
 }
-#dataDiv > table td:nth-child(2) {
+.itemsTable td:nth-child(2) {
     text-align: right;
     min-width: 100px;
 }
-#dataDiv > table td:nth-child(3) {
+.itemsTable td:nth-child(3) {
     padding-left: 10px
 }
